@@ -7,7 +7,7 @@ from datetime import datetime
 from array import array
 
 
-# read input file from argument and open output rootfile, make two trees, tree with BCam data "treeBCam" and tree with Magnet data "treeMagnet"
+# read input file from argument and open output rootfile, make two trees, tree with BCam data "treeBCam" and tree with Magnet data "treeMagnet" and also with temperatures in IT boxes "treeTemperature"
 
 
 outFile = ROOT.TFile("./../ResultTrees/BCamData_RAW.root", "recreate")
@@ -33,10 +33,7 @@ def MakeTemperatureTree(temperature_data_file):
             tree.Branch('Temp{0}{1}'.format(k+1,li[e]), temperatures[k][e], 'Temp{0}{1}/F'.format(k+1,li[e]))
 	    print str(k) + "   " + str(e)
 
-    tree.Print()
-
-
-    inFile.readline() 	# skip first line of file
+    inFile.readline() 	# skip first two lines of file
     inFile.readline()
 
     for line in inFile:
@@ -45,11 +42,10 @@ def MakeTemperatureTree(temperature_data_file):
 	boxList = line.split(",")
 
 	alternate = map(';'.join, zip(boxList[::2], boxList[1::2]))
-	#print alternate
 
-	for e in range(len(alternate)):
+	for e in range(len(alternate)):	# Loop over 12 boxes
 
-	    if alternate[e] == ';':
+	    if alternate[e] == ';':	# If the information from some box is missing, skip this box
 	        continue
 
 	    t,temperatureValue = alternate[e].split(";",2)
