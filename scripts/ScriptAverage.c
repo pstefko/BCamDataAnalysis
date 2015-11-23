@@ -1,4 +1,6 @@
 #include "TTree.h"
+#include "TView.h"
+#include "TGraph2D.h"
 #include "TMultiGraph.h"
 #include "TPaletteAxis.h"
 #include "TColor.h"
@@ -22,7 +24,7 @@ using namespace std;
 
 void AverageOneBranch(string branchName, Int_t avgSize, TTree *tree, TTree *treeAvg) ; 
 void EnableBranch(string branchName, TTree *treeAvg) ;
-void DrawGraphs(TTree *treeAvg, TTree *treeMagnet) ;
+void DrawGraphs(TTree *treeAvg, TTree *treeMagnet, TTree *treeTemperature) ;
 
 void MakeAverage(Float_t avrgSize) {
 
@@ -31,6 +33,7 @@ void MakeAverage(Float_t avrgSize) {
 
   TTree *treeAvg =  new TTree ("treeAvg", "BCam data averaged");	// Tree in an output file containing the averaged values
   TTree* treeMagnet = (TTree*) inFile->Get("treeMagnet");
+  TTree* treeTemperature = (TTree*) inFile->Get("treeTemperature");
   treeAvg->SetDirectory(0);
 
   Int_t avgSize = round(avrgSize*181);	// Input is in fraction of an hour, there is 180 measurements per hour
@@ -68,9 +71,8 @@ void MakeAverage(Float_t avrgSize) {
   TFile* outFile = new TFile(Form("./../ResultTrees/BCamData_Averaged_%.2f.root",avrgSize),"RECREATE");	// Output file 
 
   treeAvg->Write();
-  treeAvg->Print();
 
-  DrawGraphs(treeAvg, treeMagnet);		// Draw the appropriate graphs and write them into ouput file
+  DrawGraphs(treeAvg, treeMagnet, treeTemperature);		// Draw the appropriate graphs and write them into ouput file
 
   cout << "Done, file " << outFile->GetName() << " created" << endl;
 
@@ -147,20 +149,23 @@ void EnableBranch(string branchName, TTree *treeAvg) {
   treeAvg->SetBranchStatus(branchName.c_str(), 1);
 }
 
-void DrawGraphs(TTree *treeAvg, TTree *treeMagnet) {
+void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature) {
 
   // Procedure that Draws the graphs into three canvases (one for each T) 
   
-  TTree* treeDraw = (TTree*) gROOT->FindObject("treeAvg");
+  TTree* treeDraw = treeBCam;
 
 
   TCanvas* c[3];
   TCanvas* cM[3];
+  TCanvas* cCwT[3];
+  TCanvas* cT[3];
   TCanvas* cCvC[3];
   TCanvas* cCvCS[3];
   TCanvas* cHisto[3];
 
-  TGraph* g, *g1, *g2, *temp;
+  TGraph* g, *g1, *g2, *temp, *gM;
+  TGraph2D *g2d;
   TMultiGraph *mg;
   TCanvas* cDump = new TCanvas("Dump","Dump", 300,200);
   TH1F* h;
@@ -170,32 +175,156 @@ void DrawGraphs(TTree *treeAvg, TTree *treeMagnet) {
   for (int j = 0; j < 3; j++) {
 
     ostringstream js; js << j+1;
+    
+    
     string drawStringCvT[] = {"x"+js.str()+"1:t"+js.str()+"1","y"+js.str()+"1:t"+js.str()+"1","z"+js.str()+"1:t"+js.str()+"1",
       			      "x"+js.str()+"2:t"+js.str()+"2","y"+js.str()+"2:t"+js.str()+"2","z"+js.str()+"2:t"+js.str()+"2"};
     string drawStringCvC[] = {"x"+js.str()+"1:y"+js.str()+"1:t"+js.str()+"1","x"+js.str()+"1:z"+js.str()+"1:t"+js.str()+"1","y"+js.str()+"1:z"+js.str()+"1:t"+js.str()+"1",
          		      "x"+js.str()+"2:y"+js.str()+"2:t"+js.str()+"2","x"+js.str()+"2:z"+js.str()+"2:t"+js.str()+"2","y"+js.str()+"2:z"+js.str()+"2:t"+js.str()+"2"};
     string drawStringCvCS[] = {"x"+js.str()+"1:x"+js.str()+"2:t"+js.str()+"1","y"+js.str()+"1:y"+js.str()+"2:t"+js.str()+"1","z"+js.str()+"1:z"+js.str()+"2:t"+js.str()+"1"};
     string drawStringHisto[] = {"x"+js.str()+"1","y"+js.str()+"1","z"+js.str()+"1","x"+js.str()+"2","y"+js.str()+"2","z"+js.str()+"2"};
+    string drawStringTempvT[] = {"Temp"+js.str()+"A:t"+js.str()+"A","Temp"+js.str()+"B:t"+js.str()+"B","Temp"+js.str()+"C:t"+js.str()+"C","Temp"+js.str()+"T:t"+js.str()+"T"};
     
 
     //c[j] = new TCanvas(Form("cT%iCoordinateVsTime",j+1),Form("cT%iCoordinateVsTime",j+1),1400,700);
     //c[j]->Divide(3,2);
     
+    cCwT[j] = new TCanvas(Form("cT%iCoordinateVsTime_temperature",j+1),Form("cT%iCoordinateVsTime_temperature",j+1),1400,700);
+    cCwT[j]->Divide(3,2);
       
 
-    cM[j] = new TCanvas(Form("cT%iCoordinateVsTime_magnet",j+1),Form("cT%iCoordinateVsTime_magnet",j+1),1400,700);
-    cM[j]->Divide(3,2);
- //   cCvC[j] = new TCanvas(Form("cT%iCoordinateVsCoordinate",j+1),Form("cT%iCoordinateVsCoordinate",j+1),1400,700);
- //   cCvC[j]->Divide(3,2);
- //   cCvCS[j] = new TCanvas(Form("cT%iCoordinateVsCoordinate(AvsC)",j+1),Form("cT%iCoordinateVsCoordinate(AvsC)",j+1),1400,400);
- //   cCvCS[j]->Divide(3,1);
+//    cM[j] = new TCanvas(Form("cT%iCoordinateVsTime_magnet",j+1),Form("cT%iCoordinateVsTime_magnet",j+1),1400,700);
+//    cM[j]->Divide(3,2);
+    
+   // cT[j] = new TCanvas(Form("cT%iTemperatureVsTime",j+1),Form("cT%iTemperatureVsTime",j+1),1400,700);
+   // cT[j]->Divide(2,2);
+ 
+    //cCvC[j] = new TCanvas(Form("cT%iCoordinateVsCoordinate",j+1),Form("cT%iCoordinateVsCoordinate",j+1),1400,700);
+    //cCvC[j]->Divide(3,2);
+    //cCvCS[j] = new TCanvas(Form("cT%iCoordinateVsCoordinate(AvsC)",j+1),Form("cT%iCoordinateVsCoordinate(AvsC)",j+1),1400,400);
+    //cCvCS[j]->Divide(3,1);
  //   cHisto[j] = new TCanvas(Form("cT%iCoordinates",j+1),Form("cT%iCoordinates",j+1),1400,700);
  //   cHisto[j]->Divide(3,2);
 
     
     for (int i = 1; i < 7; i++) {
 
-      // Draw Coordinate VS Time with Magnet info
+      // Draw Box temperature vs time -------------------------------------
+/*
+      cDump->cd();
+      
+      double max = treeTemperature->GetMaximum(drawStringTempvT[i-1].substr(0,6).c_str()); 	// Scale used to draw the magnet info
+      double min = treeTemperature->GetMinimum(drawStringTempvT[i-1].substr(0,6).c_str());
+      double scale = max-min;
+  
+      treeTemperature->Draw(drawStringTempvT[i-1].c_str());	// Draw temperature graph
+      temp = (TGraph*)  cDump->GetPrimitive("Graph");
+      g1 = (TGraph*)temp->Clone("mygraph");
+      
+      treeMagnet->Draw(Form("(current*polarity)/6000.*%f+%f:t",scale/8.,min-scale/6));	//Draw Magnet and dump
+      temp = (TGraph*)  cDump->GetPrimitive("Graph");
+      gM = (TGraph*)temp->Clone("mygraph");
+      
+      g1->SetMarkerStyle(2);
+      g1->SetLineColor(4);
+      g1->SetLineWidth(2);
+      //g1->GetXaxis()->SetTimeDisplay(1);
+      //g1->GetXaxis()->SetTitle("t");
+      //g1->GetYaxis()->SetTitle("Temp [K]");
+      //g1->SetTitle(drawStringTempvT[i-1].substr(0,6).c_str());
+
+      gM->SetLineColor(2);
+      gM->SetLineWidth(1);
+      
+      mg = new TMultiGraph();	// Multigraph storing the graphs
+      mg->Add(g1,"PL");
+      mg->Add(gM,"L");
+      
+      cT[j]->cd(i);
+      
+      mg->SetTitle(Form("%s;t;Temp [K]",drawStringTempvT[i-1].substr(0,6).c_str()));
+      mg->Draw("AP");
+      gStyle->SetTimeOffset(0);
+      mg->GetXaxis()->SetTimeDisplay(1);
+
+
+      //mg->GetXaxis()->SetTitle("t");
+      //mg->GetYaxis()->SetTitle("Temp [K]");
+
+      //mg->SetTitle(drawStringTempvT[i-1].substr(0,6).c_str());
+      gPad->Modified();
+*/
+
+      // Draw Coordinate VS Time with Temperature info ------------------------------
+
+
+      double max = treeDraw->GetMaximum(drawStringHisto[i-1].c_str()); 	// Scale used to draw the magnet info
+      double min = treeDraw->GetMinimum(drawStringHisto[i-1].c_str());
+      double scale = max-min;
+      cout << Form("Temp%iA/3.*%f+%f:t%iA",j+1,scale/8.,min-scale/6.,j+1) << endl;
+      
+      cDump->cd();
+      
+      treeDraw->Draw(drawStringCvT[i-1].c_str());	// Draw Coordinate and dump
+      temp = (TGraph*)  cDump->GetPrimitive("Graph");
+      g1 = (TGraph*)temp->Clone("mygraph");
+
+      treeTemperature->Draw(Form("Temp%iA/3.*%f+%f:t%iA",j+1,scale/3.,min-scale/0.8,j+1));
+      
+
+      temp = (TGraph*)  cDump->GetPrimitive("Graph");
+      g2 = (TGraph*)temp->Clone("mygraph");
+
+      // Modify graphs applearance
+      
+      g1->SetMarkerColor(4);
+      g1->SetMarkerStyle(2);
+      g2->SetLineColor(2);
+      g2->SetLineWidth(1);
+
+      mg = new TMultiGraph();	// Multigraph storing the graphs
+      mg->Add(g1,"PL");
+      mg->Add(g2,"L");
+      
+      cCwT[j]->cd(i);
+      
+      mg->Draw("AP");
+      mg->GetXaxis()->SetTimeDisplay(1);
+      gStyle->SetTimeOffset(0);
+
+      mg->GetXaxis()->SetTitle("t");
+      mg->GetYaxis()->SetTitle(drawStringHisto[i-1].c_str());
+
+      gPad->Modified();
+
+      // Draw line scale
+
+      max = g1->GetHistogram()->GetMaximum(); 
+      min = g1->GetHistogram()->GetMinimum(); 
+      scale = ceil(((max-min)/4)*1000*100.)/100.;	// scale in mm
+      
+      TLatex* t;
+ 
+      t = new TLatex(.955,.75,Form("%.2f mm",scale));
+
+      //Draw TextPad with the scale
+      t->SetNDC();
+      t->SetTextFont(42);
+      t->SetTextAngle(90);
+      t->Draw();
+
+      //Draw a line representing scale
+      
+      Double_t yr = gPad->GetY2()-gPad->GetY1();
+      double y1 = (max-gPad->GetY1())/ yr; 
+      double y2 = (max-scale/1000.-gPad->GetY1())/ yr;
+      TLine *line = new TLine(0.92,y1,0.92,y2);
+      line->SetLineColor(kRed);
+      line->SetLineWidth(2);
+      line->SetNDC();
+      line->Draw();
+
+/*      // Draw Coordinate VS Time with Magnet info ------------------------------
 
       double max = treeDraw->GetMaximum(drawStringHisto[i-1].c_str()); 	// Scale used to draw the magnet info
       double min = treeDraw->GetMinimum(drawStringHisto[i-1].c_str());
@@ -270,7 +399,7 @@ void DrawGraphs(TTree *treeAvg, TTree *treeMagnet) {
 
       // Draw Coordinate VS Time plots -----------------------------
 
-     /* c[j]->cd(i);
+      c[j]->cd(i);
 
       treeDraw->Draw(drawStringCvT[i-1].c_str());
       g = (TGraph*)  c[j]->cd(i)->GetPrimitive("Graph");
@@ -304,26 +433,60 @@ void DrawGraphs(TTree *treeAvg, TTree *treeMagnet) {
       line->SetLineWidth(2);
       line->SetNDC();
       line->Draw();
-*/
-      // Draw Coordinate VS Coordinate plots --------------------------
+*/    
+/*
+      // Coordinate vs Coordinate test ----------------------------
 
-      /*gStyle->SetPalette(54);
-      gStyle->SetNumberContours(999);
+      Double_t x,y,t;
       
-      cCvC[j]->cd(i);
-      treeDraw->SetMarkerStyle(6);
-      treeDraw->Draw(drawStringCvC[i-1].c_str() ,"","col");
-      h2 = (TH2F*) cCvC[j]->cd(i)->GetPrimitive("htemp");
-      g = (TGraph*)  cCvC[j]->cd(i)->GetPrimitive("Graph");
+      g2d = new TGraph2D(treeDraw->GetEntries());
 
-      if (i < 4) {
-      cCvCS[j]->cd(i);
-      cout << i << endl;
-      treeDraw->Draw(drawStringCvCS[i-1].c_str(),"","colz");
+      treeDraw->SetBranchAddress(drawStringCvC[i-1].substr(0,3).c_str(),&x);
+      treeDraw->SetBranchAddress(drawStringCvC[i-1].substr(4,3).c_str(),&y);
+      treeDraw->SetBranchAddress(drawStringCvC[i-1].substr(8,3).c_str(),&t);
+      
+      for (int k = 0; k < treeDraw->GetEntries(); k++) {
+	treeDraw->GetEntry(k);
+	g2d->SetPoint(k,x,y,t);
       }
 
 
 
+      cCvC[j]->cd(i);
+      gStyle->SetPalette(54);
+      gStyle->SetNumberContours(100);
+      g2d->SetMarkerStyle(2);
+//      g2d->SetMarkerSize(2);
+      g2d->Draw("Pcol");
+
+      gPad->Modified(); gPad->Update();
+      cout << gPad->GetView() << endl;
+
+*/  
+  
+  
+  
+  
+  /*      // Draw Coordinate VS Coordinate plots --------------------------
+
+      gStyle->SetPalette(54);
+      gStyle->SetNumberContours(100);
+      
+      cCvC[j]->cd(i);
+      treeDraw->SetMarkerStyle(6);
+      treeDraw->SetMarkerSize(8);
+      treeDraw->Draw(drawStringCvC[i-1].c_str() ,"","contz");
+      h2 = (TH2F*) cCvC[j]->cd(i)->GetPrimitive("htemp");
+      gPad->GetListOfPrimitives()->Print();
+
+      if (i < 4) {
+      cCvCS[j]->cd(i);
+      cout << i << endl;
+      treeDraw->Draw(drawStringCvCS[i-1].c_str(),"","contz");
+      }
+*/
+
+/*
       // Draw histograms of coordinate values -------------------------
 
       cHisto[j]->cd(i);
@@ -336,7 +499,8 @@ void DrawGraphs(TTree *treeAvg, TTree *treeMagnet) {
 
     }
 
-    cM[j]->Write();
+    //cM[j]->Write();
+    //cT[j]->Write();
     //c[j]->Write();
     //cCvC[j]->Write();
     //cCvCS[j]->Write();
