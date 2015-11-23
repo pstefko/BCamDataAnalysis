@@ -27,6 +27,7 @@ void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19
   TFile *inFile = new TFile("./../ResultTrees/BCamData_RAW.root"); 	// Input file 
   TTree *treeB = (TTree*) inFile->Get("treeBCam");	// Tree from an input file containing RAW data from the .csv files arranged in a big tree
   TTree *treeM = (TTree*) inFile->Get("treeMagnet");
+  TTree *treeT = (TTree*) inFile->Get("treeTemperature");
 
   struct tm tm;			// Conver input times into UNIX epoch timestamp
   strptime(startTime.c_str(), "%d-%m-%Y %H:%M:%S", &tm);
@@ -38,9 +39,11 @@ void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19
 
   SkimTree(treeB, startEpoch, endEpoch, removeJumps);
   SkimTree(treeM, startEpoch, endEpoch, removeJumps);
+  SkimTree(treeT, startEpoch, endEpoch, removeJumps);
 
   treeB->Write();
   treeM->Write();
+  treeT->Write();
 
   cout << "Done, file ./../ResultTrees/BCamData_Skimmed.root created." << endl; 
 
@@ -53,7 +56,7 @@ void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJum
 
   // This procedure makes a new tree containing only values in the interested time interval and remove jumps if requested
   
-  string jumpTime[22] = {"11-05-2015 02:00:00","12-05-2015 12:00:00","05-06-2015 19:00:00","06-06-2015 23:00:00","07-06-2015 11:00:00","07-06-2015 21:00:00","15-06-2015 03:00:00","22-06-2015 03:00:00","16-07-2015 05:00:00","16-07-2015 17:00:00","21-07-2015 05:00:00","25-07-2015 17:00:00","08-08-2015 05:00:00","08-08-2015 17:00:00","24-08-2015 02:00:00","24-08-2015 09:00:00","31-08-2015 02:00:00","05-09-2015 07:00:00","23-09-2015 05:00:00","23-09-2015 23:00:00","18-10-2015 08:00:00","20-10-2015 04:00:00"}; 
+  string jumpTime[24] = {"11-05-2015 02:00:00","12-05-2015 12:00:00","05-06-2015 19:00:00","06-06-2015 23:00:00","07-06-2015 11:00:00","07-06-2015 21:00:00","15-06-2015 03:00:00","22-06-2015 03:00:00","16-07-2015 05:00:00","16-07-2015 17:00:00","21-07-2015 05:00:00","25-07-2015 17:00:00","08-08-2015 05:00:00","08-08-2015 17:00:00","24-08-2015 02:00:00","24-08-2015 09:00:00","31-08-2015 02:00:00","05-09-2015 07:00:00","23-09-2015 05:00:00","23-09-2015 23:00:00","18-10-2015 08:00:00","20-10-2015 04:00:00","09-11-2015 04:00:00","13-11-2015 18:00:00"}; 
 
   Int_t t = 0;
 
@@ -62,7 +65,8 @@ void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJum
   cout << "Skimming " << treeName << endl;
   
   if (treeName == "treeBCam") 	  treeIn->SetBranchAddress("t11",&t);
-  if (treeName == "treeMagnet")   treeIn->SetBranchAddress("t",&t);
+  if (treeName == "treeMagnet")   {treeIn->SetBranchAddress("t",&t); removeJumps = false;}
+  if (treeName == "treeTemperature")   {treeIn->SetBranchAddress("t1A",&t); removeJumps = false;}
 
   TTree* treeSkim = treeIn->CloneTree(0);
 
@@ -73,7 +77,7 @@ void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJum
     
     if ((t > startEpoch) && (t < endEpoch)) {
       struct tm tm; 
-      for (int j = 0; j < 11; j++) {
+      for (int j = 0; j < 12; j++) {
          
          strptime(jumpTime[j*2].c_str(), "%d-%m-%Y %H:%M:%S", &tm);
          Int_t jump1 = mktime(&tm);

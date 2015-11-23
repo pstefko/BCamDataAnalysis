@@ -31,7 +31,6 @@ def MakeTemperatureTree(temperature_data_file):
         for e in range(len(li)):
             tree.Branch('t{0}{1}'.format(k+1,li[e]), times[k][e], 't{0}{1}/I'.format(k+1,li[e]))
             tree.Branch('Temp{0}{1}'.format(k+1,li[e]), temperatures[k][e], 'Temp{0}{1}/F'.format(k+1,li[e]))
-	    print str(k) + "   " + str(e)
 
     inFile.readline() 	# skip first two lines of file
     inFile.readline()
@@ -49,6 +48,11 @@ def MakeTemperatureTree(temperature_data_file):
 	        continue
 
 	    t,temperatureValue = alternate[e].split(";",2)
+
+	    if ((float(temperatureValue) > 20.0) or (float(temperatureValue) < 1.0)):	# If the temperature is nonsense, get rid of it
+	        print temperatureValue
+	        continue
+
 	    day, time = t.split(" ",2)
 	    day = datetime.strptime(day, "%d/%m/%Y").strftime("%Y-%m-%d")
 	    daytime = day + " " + time
