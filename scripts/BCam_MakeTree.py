@@ -13,7 +13,57 @@ from array import array
 outFile = ROOT.TFile("./../ResultTrees/BCamData_RAW.root", "recreate")
 treeBCam = ROOT.TTree("treeBCam","Data from all cameras")
 
-def MakeTemperatureTree(temperature_data_file):
+def MakeTemperatureTree(temperature_data_file, whichStation, whichBox):		# Take temperature file and name of box and make tree with temperatyures
+    
+    inFile = open(temperature_data_file, 'r')
+    zeit = ROOT.TDatime()
+    print temperature_data_file
+
+    tree = ROOT.TTree("treeTemperature{0}{1}".format(whichStation,whichBox),"Temperature in the T{0} box {1}".format(whichStation,whichBox))
+    print tree
+
+    timez = array('i',[0])
+    temperature = array('f',[0.])
+        
+    tree.Branch('t', timez, 't/I')
+    tree.Branch('temperature', temperature, 'temperature/F')
+
+    inFile.readline() 	# skip first two lines of file
+    inFile.readline()
+
+    dict = {'1A': 1,'1B': 2,'1C': 3,'1T': 4,'2A': 5,'2B': 6,'2C': 7,'2T': 8,'3A': 9,'3B': 10,'3C': 11,'3T': 12}
+    boxNumber = dict[whichStation + whichBox] - 1
+
+    for line in inFile:
+        
+        line = line.strip()[1:]
+	boxList = line.split(",")
+
+	alternate = map(';'.join, zip(boxList[::2], boxList[1::2]))
+
+	if alternate[boxNumber] == ';':	# If the information from some box is missing, skip this box': 1,
+	    continue
+
+	t,temperatureValue = alternate[boxNumber].split(";",2)
+
+	if ((float(temperatureValue) > 20.0) or (float(temperatureValue) < 1.0)):	# If the temperature is nonsense, get rid of it
+	    continue
+
+	day, time = t.split(" ",2)
+	day = datetime.strptime(day, "%d/%m/%Y").strftime("%Y-%m-%d")
+	daytime = day + " " + time
+	zeit.Set(daytime)
+	
+	timez[0] = zeit.Convert()
+	temperature[0] = float(temperatureValue)
+
+	tree.Fill()
+
+    tree.Print()
+    tree.Write()
+    inFile.close()
+
+def MakeTemperaturesTree(temperature_data_file):
     
     inFile = open(temperature_data_file, 'r')
     zeit = ROOT.TDatime()
@@ -30,20 +80,10 @@ def MakeTemperatureTree(temperature_data_file):
     time = array('i',[0])
     temperature = array('f',[0.])
 
-    timeStrings = []
-    tempStrings = []
-    listOfTimeBranches = []
-    listOfTempBranches = []
-
-
     for k in xrange(3):
         for e in range(len(li)):
             tree.Branch('t{0}{1}'.format(k+1,li[e]), times[k][e], 't{0}{1}/I'.format(k+1,li[e]))
             tree.Branch('Temp{0}{1}'.format(k+1,li[e]), temperatures[k][e], 'Temp{0}{1}/F'.format(k+1,li[e]))
-            #listOfTimeBranches.append(tree.Branch('t{0}{1}'.format(k+1,li[e]), time, 't{0}{1}/I'.format(k+1,li[e])))
-            #listOfTempBranches.append(tree.Branch('Temp{0}{1}'.format(k+1,li[e]), temperature, 'Temp{0}{1}/I'.format(k+1,li[e])))
-	    #timeStrings.append('t{0}{1}'.format(k+1,li[e]))
-	    #tempStrings.append('Temp{0}{1}'.format(k+1,li[e]))
 
     inFile.readline() 	# skip first two lines of file
     inFile.readline()
@@ -73,12 +113,6 @@ def MakeTemperatureTree(temperature_data_file):
 	    times[e/4][e%4][0] = zeit.Convert()
 	    temperatures[e/4][e%4][0] = float(temperatureValue)
         
-	    #time = zeit.Convert
-	    #temperature = float(temperatureValue)
-
-	    #listOfTimeBranches[e].Fill()
-	    #listOfTempBranches[e].Fill()
-
 	tree.Fill()
 
     tree.Print()
@@ -234,7 +268,12 @@ def EnableBranches(BCam_data_file):
     return
 
 MakeMagnetTree("./../BCamDataAll/Magnet.csv")
-MakeTemperatureTree("./../BCamDataAll/Temperature.csv")
+#MakeTemperaturesTree("./../BCamDataAll/Temperature.csv")
+
+for e in ['1','2','3']: 
+  for i in ['A','B','C','T']:
+    MakeTemperatureTree("./../BCamDataAll/Temperature.csv",e,i)
+
 MakeVoltageTree("./../BCamDataAll/Voltage.csv")
 
 AddBCamBranches("./../BCamDataAll/BCam11.csv")    

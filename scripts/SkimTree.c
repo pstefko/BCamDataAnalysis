@@ -25,10 +25,17 @@ void MatchCoordinatesWithTemperatures(TTree *treeInTemperatures, TTree *treeInBC
 
 void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19-11-2015 00:00:00", Bool_t removeJumps = false) {
 
+  string boxes[12] = {"1A","1B","1C","1T","2A","2B","2C","2T","3A","3B","3C","3T"};
+  TTree *treeT[12];
+
   TFile *inFile = new TFile("./../ResultTrees/BCamData_RAW.root"); 	// Input file 
   TTree *treeB = (TTree*) inFile->Get("treeBCam");	// Tree from an input file containing RAW data from the .csv files arranged in a big tree
   TTree *treeM = (TTree*) inFile->Get("treeMagnet");
-  TTree *treeT = (TTree*) inFile->Get("treeTemperature");
+  TTree *treeV = (TTree*) inFile->Get("treeVoltage");
+
+  for (int i = 0; i < 12; i++) {
+    treeT[i] = (TTree*) inFile->Get(Form("treeTemperature%s",boxes[i].c_str()));
+  }
 
   struct tm tm;			// Conver input times into UNIX epoch timestamp
   strptime(startTime.c_str(), "%d-%m-%Y %H:%M:%S", &tm);
@@ -40,13 +47,18 @@ void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19
 
   SkimTree(treeB, startEpoch, endEpoch, removeJumps);
   SkimTree(treeM, startEpoch, endEpoch, removeJumps);
-  SkimTree(treeT, startEpoch, endEpoch, removeJumps);
+  SkimTree(treeV, startEpoch, endEpoch, removeJumps);
+
+  for (int i = 0; i < 12; i++) {
+    SkimTree(treeT[i], startEpoch, endEpoch, removeJumps);
+    treeT[i]->Write();
+  }
   
   //MatchCoordinatesWithTemperatures(treeT, treeB);
 
   treeB->Write();
   treeM->Write();
-  treeT->Write();
+  treeV->Write();
 
   cout << "Done, file ./../ResultTrees/BCamData_Skimmed.root created." << endl; 
 
@@ -156,9 +168,10 @@ void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJum
 
   cout << "Skimming " << treeName << endl;
   
-  if (treeName == "treeBCam") 	  treeIn->SetBranchAddress("t11",&t);
-  if (treeName == "treeMagnet")   {treeIn->SetBranchAddress("t",&t); removeJumps = false;}
-  if (treeName == "treeTemperature")   {treeIn->SetBranchAddress("t1A",&t); removeJumps = false;}
+  if (treeName == "treeBCam") 	  	treeIn->SetBranchAddress("t11",&t);
+  if (treeName == "treeMagnet")   	{treeIn->SetBranchAddress("t",&t); removeJumps = false;}
+  if (treeName.substr(0,15) == "treeTemperature")   	{treeIn->SetBranchAddress("t",&t); removeJumps = false;}
+  if (treeName == "treeVoltage")   	{treeIn->SetBranchAddress("t",&t); removeJumps = false;}
 
   TTree* treeSkim = treeIn->CloneTree(0);
 
