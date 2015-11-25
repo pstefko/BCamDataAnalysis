@@ -27,10 +27,23 @@ def MakeTemperatureTree(temperature_data_file):
     times = [[array('i',[0]) for k in li] for e in xrange(3)]	# Array 3x4 (3 detectors, 4 boxes)
     temperatures = [[array('f',[0.]) for k in li] for e in xrange(3)]
 
+    time = array('i',[0])
+    temperature = array('f',[0.])
+
+    timeStrings = []
+    tempStrings = []
+    listOfTimeBranches = []
+    listOfTempBranches = []
+
+
     for k in xrange(3):
         for e in range(len(li)):
             tree.Branch('t{0}{1}'.format(k+1,li[e]), times[k][e], 't{0}{1}/I'.format(k+1,li[e]))
             tree.Branch('Temp{0}{1}'.format(k+1,li[e]), temperatures[k][e], 'Temp{0}{1}/F'.format(k+1,li[e]))
+            #listOfTimeBranches.append(tree.Branch('t{0}{1}'.format(k+1,li[e]), time, 't{0}{1}/I'.format(k+1,li[e])))
+            #listOfTempBranches.append(tree.Branch('Temp{0}{1}'.format(k+1,li[e]), temperature, 'Temp{0}{1}/I'.format(k+1,li[e])))
+	    #timeStrings.append('t{0}{1}'.format(k+1,li[e]))
+	    #tempStrings.append('Temp{0}{1}'.format(k+1,li[e]))
 
     inFile.readline() 	# skip first two lines of file
     inFile.readline()
@@ -50,19 +63,59 @@ def MakeTemperatureTree(temperature_data_file):
 	    t,temperatureValue = alternate[e].split(";",2)
 
 	    if ((float(temperatureValue) > 20.0) or (float(temperatureValue) < 1.0)):	# If the temperature is nonsense, get rid of it
-	        print temperatureValue
 	        continue
 
 	    day, time = t.split(" ",2)
 	    day = datetime.strptime(day, "%d/%m/%Y").strftime("%Y-%m-%d")
 	    daytime = day + " " + time
 	    zeit.Set(daytime)
+	    
 	    times[e/4][e%4][0] = zeit.Convert()
-
 	    temperatures[e/4][e%4][0] = float(temperatureValue)
         
+	    #time = zeit.Convert
+	    #temperature = float(temperatureValue)
+
+	    #listOfTimeBranches[e].Fill()
+	    #listOfTempBranches[e].Fill()
+
 	tree.Fill()
 
+    tree.Print()
+    tree.Write()
+    inFile.close()
+
+def MakeVoltageTree(voltage_data_file):
+    
+    inFile = open(voltage_data_file, 'r')
+    zeit = ROOT.TDatime()
+    print voltage_data_file
+
+    tree = ROOT.TTree("treeVoltage","Voltage in detector")
+    print tree
+
+    timez = array('i',[0])
+    voltage = array('f',[0.])
+
+    tree.Branch('t' , timez, 't/I')
+    tree.Branch('voltage', voltage, 'voltage/F')
+
+    for line in inFile:
+        
+        line = line.strip()
+
+	t,voltageValue = line.split(",",2)
+	day, time = t.split(" ",2)
+	day = datetime.strptime(day, "%d/%m/%Y").strftime("%Y-%m-%d")
+	daytime = day + " " + time
+	zeit.Set(daytime)
+	timez[0] = zeit.Convert()
+
+	voltage[0] = float(voltageValue)
+	
+	tree.Fill()
+    
+    tree.Print()
     tree.Write()
     inFile.close()
 
@@ -182,6 +235,7 @@ def EnableBranches(BCam_data_file):
 
 MakeMagnetTree("./../BCamDataAll/Magnet.csv")
 MakeTemperatureTree("./../BCamDataAll/Temperature.csv")
+MakeVoltageTree("./../BCamDataAll/Voltage.csv")
 
 AddBCamBranches("./../BCamDataAll/BCam11.csv")    
 AddBCamBranches("./../BCamDataAll/BCam12.csv")    
