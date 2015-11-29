@@ -21,7 +21,7 @@ using namespace std;
 
 
 void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJumps) ;
-void MatchCoordinatesWithTemperatures(TTree *treeInTemperatures, TTree *treeInBCam) ;
+void MatchCoordinatesWithTemperatures(TTree *treeInTemperature, TTree *treeInBCam) ;
 
 void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19-11-2015 00:00:00", Bool_t removeJumps = false) {
 
@@ -51,14 +51,18 @@ void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19
 
   for (int i = 0; i < 12; i++) {
     SkimTree(treeT[i], startEpoch, endEpoch, removeJumps);
-    treeT[i]->Write();
   }
   
-  //MatchCoordinatesWithTemperatures(treeT, treeB);
+  MatchCoordinatesWithTemperatures(treeT[0], treeB);
+  MatchCoordinatesWithTemperatures(treeT[4], treeB);
+  MatchCoordinatesWithTemperatures(treeT[8], treeB);
 
   treeB->Write();
   treeM->Write();
   treeV->Write();
+  for (int i = 0; i < 12; i++) {
+    treeT[i]->Write();
+  }
 
   cout << "Done, file ./../ResultTrees/BCamData_Skimmed.root created." << endl; 
 
@@ -66,95 +70,98 @@ void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19
   delete outFile;
 }
 
-void MatchCoordinatesWithTemperatures(TTree *treeInTemperatures, TTree *treeInBCam) {
+void MatchCoordinatesWithTemperatures(TTree *treeInTemperature, TTree *treeInBCam) {
 
-  Int_t NT = treeInTemperatures->GetEntries();
-
-  Int_t t1, t2, t3;
-  Int_t tT1[NT];
-  Int_t tT2[NT];
-  Int_t tT3[NT];
-  Float_t x[3][2];
-  Float_t y[3][2];
-  Float_t z[3][2];
-  Float_t xn[3][2];
-  Float_t yn[3][2];
-  Float_t zn[3][2];
-  TBranch *bx[3][2];
-  TBranch *by[3][2];
-  TBranch *bz[3][2];
-
-  treeInTemperatures->SetBranchAddress("t1A",&t1);
-  treeInTemperatures->SetBranchAddress("t2A",&t2);
-  treeInTemperatures->SetBranchAddress("t3A",&t3);
-
-  for (int i = 0; i < NT; i++) {	// Save times from A box in each station into array
-    treeInTemperatures->GetEntry(i);
-    tT1[i] = t1;
-    tT2[i] = t2;
-    tT3[i] = t3;
-  }
-
-  Int_t NB = treeInBCam->GetEntries();
+  Int_t tT, tB;
+  Float_t Temp;
+  Float_t x[2]; Float_t y[2]; Float_t z[2];
+  Float_t xprev[2]; Float_t yprev[2]; Float_t zprev[2];
+  Float_t xnext[2]; Float_t ynext[2]; Float_t znext[2];
+  Float_t xn[2]; Float_t yn[2]; Float_t zn[2];
+  TBranch *bx[2]; TBranch *by[2]; TBranch *bz[2];
   
-  treeInBCam->SetBranchAddress("t11",&t1);
-  treeInBCam->SetBranchAddress("t21",&t2);
-  treeInBCam->SetBranchAddress("t31",&t3);
-      
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 2; j++) {
+  Int_t NT = treeInTemperature->GetEntries();
+  Int_t NB = treeInBCam->GetEntries();
 
-      treeInBCam->SetBranchAddress(Form("x%i%i",i+1,j+1),&x[i][j]);
-      treeInBCam->SetBranchAddress(Form("y%i%i",i+1,j+1),&y[i][j]);
-      treeInBCam->SetBranchAddress(Form("z%i%i",i+1,j+1),&z[i][j]);
-      
-      bx[i][j] = (TBranch*) treeInTemperatures->Branch(Form("x%i%i",i+1,j+1),&xn[i][j],Form("x%i%i/F",i+1,j+1));
-      by[i][j] = (TBranch*) treeInTemperatures->Branch(Form("y%i%i",i+1,j+1),&yn[i][j],Form("y%i%i/F",i+1,j+1));
-      bz[i][j] = (TBranch*) treeInTemperatures->Branch(Form("z%i%i",i+1,j+1),&zn[i][j],Form("z%i%i/F",i+1,j+1));
-    }
+  char whichStation = treeInTemperature->GetName()[15];
+
+  TTree *treeTnew = new TTree(Form("treeTemperatureWithCoordinatesT%c",whichStation),"Tree containing temperatures from box A matched with coordinates from BCam");
+
+  treeInTemperature->SetBranchAddress("t",&tT);
+  treeInTemperature->SetBranchAddress("temperature",&Temp);
+  treeInBCam->SetBranchAddress("t11",&tB);
+
+  TBranch *bt = (TBranch*) treeTnew->Branch("t",&tT,"t/I");	// New coordinate Branches in Temperature tree
+  TBranch *bT = (TBranch*) treeTnew->Branch("temperature",&Temp,"temperature/F");
+
+  for (int j = 0; j < 2; j++) {
+
+    treeInBCam->SetBranchAddress(Form("x%c%i",whichStation,j+1),&x[j]);
+    treeInBCam->SetBranchAddress(Form("y%c%i",whichStation,j+1),&y[j]);
+    treeInBCam->SetBranchAddress(Form("z%c%i",whichStation,j+1),&z[j]);
+    
+    bx[j] = (TBranch*) treeTnew->Branch(Form("x%i",j+1),&xn[j],Form("x%i/F",j+1));	// New coordinate Branches in Temperature tree
+    by[j] = (TBranch*) treeTnew->Branch(Form("y%i",j+1),&yn[j],Form("y%i/F",j+1));
+    bz[j] = (TBranch*) treeTnew->Branch(Form("z%i",j+1),&zn[j],Form("z%i/F",j+1));
   }
 
+  Int_t prevJ = 0;
+  Int_t newEntries = 0;
 
-  for (int i = 0; i < NT; i++) {
+  for (int i = 0; i < NT; i++) {	// Loop over entries in TemperatureTree
 
-    cout << i << endl;
-    for (int j = 0; j < NB; j++) {
+    treeInTemperature->GetEntry(i);
+    Bool_t hasMatch = false;
+
+    for (int j = prevJ; j < NB; j++) {	// Loop over entries in BCam tree
       
+      treeInBCam->GetEntry(j-1);
+      xprev[0]=x[0]; xprev[1]=x[1]; yprev[0]=y[0]; yprev[1]=y[1]; zprev[0]=z[0]; zprev[1]=z[1];
+      treeInBCam->GetEntry(j+1);
+      xnext[0]=x[0]; xnext[1]=x[1]; ynext[0]=y[0]; ynext[1]=y[1]; znext[0]=z[0]; znext[1]=z[1];
+
       treeInBCam->GetEntry(j);
-      //if (i == 36) {cout << t1 << "   " << tT1[i] << endl;}
 
-      if (abs(t1-tT1[i]) < 100) {
-	xn[0][0]=x[0][0]; xn[0][1]=x[0][1]; yn[0][0]=y[0][0]; yn[0][1]=y[0][1]; zn[0][0]=z[0][0]; zn[0][1]=z[0][1];
-	cout << "  match1" << endl;
+      // If we find a match (less than 100 seconds difference) save the coordinates
+
+      if (abs(tT-tB) < 100) {		
+	xn[0]=x[0]; xn[1]=x[1]; yn[0]=y[0]; yn[1]=y[1]; zn[0]=z[0]; zn[1]=z[1];
+
+        // Apply the cuts removing the defective points, if it is defective consider the previous value
+	for (int k = 0; k < 2; k++) {
+	  if ((((abs(x[k]-xprev[k]) > 0.0003) && (abs(x[k]-xnext[k]) > 0.0003)) || (abs(x[k]-xprev[k]) > 0.01))) xn[k] = xprev[k];
+	  if ((((abs(y[k]-yprev[k]) > 0.0002) && (abs(y[k]-ynext[k]) > 0.0002)) || (abs(y[k]-yprev[k]) > 0.01))) yn[k] = yprev[k];
+	  if ((((abs(z[k]-zprev[k]) > 0.001) && (abs(z[k]-znext[k]) > 0.001)) || (abs(z[k]-zprev[k]) > 0.03))) zn[k] = zprev[k];
+	}
+
+	cout << i << "     " << j << endl;
+	hasMatch = true;
+	prevJ = j;
+	break;
       }
-      if (abs(t2-tT2[i]) < 100) {
-	xn[1][0]=x[1][0]; xn[1][1]=x[1][1]; yn[1][0]=y[1][0]; yn[1][1]=y[1][1]; zn[1][0]=z[1][0]; zn[1][1]=z[1][1];
-	cout  << "  match2" << endl;
-      }
-      if (abs(t3-tT3[i]) < 100) {
-	xn[2][0]=x[2][0]; xn[2][1]=x[2][1]; yn[2][0]=y[2][0]; yn[2][1]=y[2][1]; zn[2][0]=z[2][0]; zn[2][1]=z[2][1];
-	cout  << "  match3" << endl;
-      }
-
-
-
 
     }
 
-    for (int l = 0; l < 3; l++) {
-      for (int k = 0; k < 2; k++) {
-	bx[l][k]->Fill();
-	by[l][k]->Fill();
-	bz[l][k]->Fill();
-      }
+    // If we have a match fill the Branches in new TemperatureTree with coordinates and time and temperature
+
+    if (hasMatch == false) continue;
+
+    newEntries += 1;
+    bt->Fill();
+    bT->Fill();
+    
+    for (int k = 0; k < 2; k++) {
+      bx[k]->Fill();
+      by[k]->Fill();
+      bz[k]->Fill();
     }
-      
+   
   }
-
-  treeInTemperatures->Print();
-
+  
+  treeTnew->SetEntries(newEntries);
+  treeTnew->Print();
+  treeTnew->Write();
 }
-
 
 void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJumps) {
 

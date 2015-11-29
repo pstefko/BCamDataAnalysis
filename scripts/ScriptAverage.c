@@ -24,7 +24,7 @@ using namespace std;
 
 void AverageOneBranch(string branchName, Int_t avgSize, TTree *tree, TTree *treeAvg) ; 
 void EnableBranch(string branchName, TTree *treeAvg) ;
-void DrawGraphs(TTree *treeAvg, TTree *treeMagnet, TTree *treeTemperature[3][4], TTree *treeVoltage) ;
+void DrawGraphs(TTree *treeAvg, TTree *treeMagnet, TTree *treeTemperature[3][4], TTree *treeVoltage, TTree *treeCoordinateWithTemperature[3]) ;
 
 void MakeAverage(Float_t avrgSize) {
 
@@ -39,8 +39,10 @@ void MakeAverage(Float_t avrgSize) {
   string boxes[12] = {"1A","1B","1C","1T","2A","2B","2C","2T","3A","3B","3C","3T"};
 
   TTree *treeTemperature[3][4];
+  TTree *treeCoordinateWithTemperature[3];
   
   for (int i = 0; i < 3; i++) {
+    treeCoordinateWithTemperature[i] = (TTree*) inFile->Get(Form("treeTemperatureWithCoordinatesT%i",i+1));
     for (int j = 0; j < 4; j++) {
       treeTemperature[i][j] = (TTree*) inFile->Get(Form("treeTemperature%s",boxes[(i+1)*j].c_str()));
     }
@@ -82,7 +84,7 @@ void MakeAverage(Float_t avrgSize) {
 
   treeAvg->Write();
 
-  DrawGraphs(treeAvg, treeMagnet, treeTemperature, treeVoltage);		// Draw the appropriate graphs and write them into ouput file
+  DrawGraphs(treeAvg, treeMagnet, treeTemperature, treeVoltage, treeCoordinateWithTemperature);		// Draw the appropriate graphs and write them into ouput file
 
   cout << "Done, file " << outFile->GetName() << " created" << endl;
 
@@ -159,7 +161,7 @@ void EnableBranch(string branchName, TTree *treeAvg) {
   treeAvg->SetBranchStatus(branchName.c_str(), 1);
 }
 
-void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4], TTree *treeVoltage) {
+void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4], TTree *treeVoltage, TTree *treeCoordinateWithTemperature[3]) {
 
   // Procedure that Draws the graphs into three canvases (one for each T) 
   
@@ -168,14 +170,15 @@ void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4]
 
   TCanvas* c[3];
   TCanvas* cM[3];
-  TCanvas* cCwT[3];
-  TCanvas* cVwT[3];
-  TCanvas* cT[3];
+  TCanvas* cCwTemp[3];
+  TCanvas* cTempwV[3];
+  TCanvas* cTemp[3];
   TCanvas* cCvC[3];
+  TCanvas* cCvT[3];
   TCanvas* cCvCS[3];
   TCanvas* cHisto[3];
 
-  TGraph* g, *g1, *g2, *temp, *gM, *gV;
+  TGraph* g, *g1, *g2, *temp, *gM, *gV, *gT;
   TGraph2D *g2d;
   TMultiGraph *mg;
   TCanvas* cDump = new TCanvas("Dump","Dump", 300,200);
@@ -195,21 +198,22 @@ void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4]
     string drawStringCvCS[] = {"x"+js.str()+"1:x"+js.str()+"2:t"+js.str()+"1","y"+js.str()+"1:y"+js.str()+"2:t"+js.str()+"1","z"+js.str()+"1:z"+js.str()+"2:t"+js.str()+"1"};
     string drawStringHisto[] = {"x"+js.str()+"1","y"+js.str()+"1","z"+js.str()+"1","x"+js.str()+"2","y"+js.str()+"2","z"+js.str()+"2"};
     string drawStringTempvT[] = {"Temp"+js.str()+"A:t"+js.str()+"A","Temp"+js.str()+"B:t"+js.str()+"B","Temp"+js.str()+"C:t"+js.str()+"C","Temp"+js.str()+"T:t"+js.str()+"T"};
+    string drawStringCvTemp[] = {"x1:temperature:t","y1:temperature:t","z1:temperature:t","x2:temperature:t","y2:temperature:t","z2:temperature:t"};
     
 
     
 /*    
-    c[j] = new TCanvas(Form("cT%iCoordinateVsTime",j+1),Form("cT%iCoordinateVsTime",j+1),1400,700);
-    c[j]->Divide(3,2);
+    cC[j] = new TCanvas(Form("cT%iCoordinateVsTime",j+1),Form("cT%iCoordinateVsTime",j+1),1400,700);
+    cC[j]->Divide(3,2);
     
-    cCwT[j] = new TCanvas(Form("cT%iCoordinateVsTime_temperature",j+1),Form("cT%iCoordinateVsTime_temperature",j+1),1400,700);
-    cCwT[j]->Divide(3,2);
+    cCwTemp[j] = new TCanvas(Form("cT%iCoordinateVsTimeWithTemperature",j+1),Form("cT%iCoordinateVsTimeWithTemperature",j+1),1400,700);
+    cCwTemp[j]->Divide(3,2);
       
-    cM[j] = new TCanvas(Form("cT%iCoordinateVsTime_magnet",j+1),Form("cT%iCoordinateVsTime_magnet",j+1),1400,700);
-    cM[j]->Divide(3,2);
+    cCwM[j] = new TCanvas(Form("cT%iCoordinateVsTimeWithMagnet",j+1),Form("cT%iCoordinateVsTimeWithMagnet",j+1),1400,700);
+    cCwM[j]->Divide(3,2);
     
-    cT[j] = new TCanvas(Form("cT%iTemperatureVsTime",j+1),Form("cT%iTemperatureVsTime",j+1),1400,700);
-    cT[j]->Divide(2,2);
+    cTemp[j] = new TCanvas(Form("cT%iTemperatureVsTime",j+1),Form("cT%iTemperatureVsTime",j+1),1400,700);
+    cTemp[j]->Divide(2,2);
  
     cCvC[j] = new TCanvas(Form("cT%iCoordinateVsCoordinate",j+1),Form("cT%iCoordinateVsCoordinate",j+1),1400,700);
     cCvC[j]->Divide(3,2);
@@ -221,12 +225,14 @@ void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4]
     cHisto[j]->Divide(3,2);
 */
 
-    cVwT[j] = new TCanvas(Form("cT%iTemperatureWithVoltage",j+1),Form("cT%iTemperatureWithVoltage",j+1),1400,700);
-    cVwT[j]->Divide(2,2);
+    cTempwV[j] = new TCanvas(Form("cT%iTemperatureWithVoltage",j+1),Form("cT%iTemperatureWithVoltage",j+1),1400,700);
+    cTempwV[j]->Divide(2,2);
 
+    cCvT[j] = new TCanvas(Form("cT%iCoordinateVsTemperature",j+1),Form("cT%iCoordinateVsTemperature",j+1),1400,700);
+    cCvT[j]->Divide(3,2);
     
     for (int i = 0; i < 6; i++) {
-
+/*
       // Draw Box temperature vs time with Voltage -------------------------------------
 
       if (i > 3) break;
@@ -239,28 +245,24 @@ void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4]
   
       treeTemperature[j][i]->Draw("temperature:t");	// Draw temperature graph
       temp = (TGraph*)  cDump->GetPrimitive("Graph");
-      g1 = (TGraph*)temp->Clone("mygraph");
+      gT = (TGraph*)temp->Clone("mygraph");
       
       treeVoltage->Draw(Form("voltage/250*%f+%f:t",scale/2,min-scale/2));	//Draw Magnet and dump
       temp = (TGraph*)  cDump->GetPrimitive("Graph");
       gV = (TGraph*)temp->Clone("mygraph");
       
-      g1->SetMarkerStyle(2);
-      g1->SetLineColor(4);
-      g1->SetLineWidth(2);
-      //g1->GetXaxis()->SetTimeDisplay(1);
-      //g1->GetXaxis()->SetTitle("t");
-      //g1->GetYaxis()->SetTitle("Temp [K]");
-      //g1->SetTitle(drawStringTempvT[i].substr(0,6).c_str());
+      gT->SetMarkerStyle(2);
+      gT->SetLineColor(4);
+      gT->SetLineWidth(2);
 
       gV->SetLineColor(2);
       gV->SetLineWidth(1);
       
       mg = new TMultiGraph();	// Multigraph storing the graphs
-      mg->Add(g1,"PL");
+      mg->Add(gT,"L");
       mg->Add(gV,"L");
       
-      cVwT[j]->cd(i+1);
+      cTempwV[j]->cd(i+1);
       
       mg->SetTitle(Form("%s;t;Temp [C]",drawStringTempvT[i].substr(0,6).c_str()));
       mg->Draw("AP");
@@ -268,6 +270,17 @@ void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4]
       mg->GetXaxis()->SetTimeDisplay(1);
 
       gPad->Modified();
+*/
+      // Draw Coordinate vs Temperature ----------------------------------------------
+
+      gStyle->SetPalette(54);
+      gStyle->SetNumberContours(100);
+      
+      cCvT[j]->cd(i+1);
+      treeCoordinateWithTemperature[j]->SetMarkerStyle(6);
+      treeCoordinateWithTemperature[j]->SetMarkerSize(8);
+      treeCoordinateWithTemperature[j]->Draw(drawStringCvTemp[i].c_str() ,"","colz");
+      h2 = (TH2F*) cCvT[j]->cd(i+1)->GetPrimitive("htemp");
 
 
       // Draw Box temperature vs time with Magnet -------------------------------------
@@ -563,7 +576,7 @@ void DrawGraphs(TTree *treeBCam, TTree *treeMagnet, TTree *treeTemperature[3][4]
     }
 
     //cM[j]->Write();
-    //cVwt[j]->Write();
+    cTempwV[j]->Write();
     //cT[j]->Write();
     //cCwT[j]->Write();
     //c[j]->Write();
