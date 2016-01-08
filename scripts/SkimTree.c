@@ -23,15 +23,17 @@ using namespace std;
 void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJumps) ;
 void MatchCoordinatesWithTemperatures(TTree *treeInTemperature, TTree *treeInBCam) ;
 
-void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19-11-2015 00:00:00", Bool_t removeJumps = false) {
+void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "07-01-2016 00:00:00", Bool_t removeJumps = false) {
 
   string boxes[12] = {"1A","1B","1C","1T","2A","2B","2C","2T","3A","3B","3C","3T"};
   TTree *treeT[12];
 
-  TFile *inFile = new TFile("./../ResultTrees/BCamData_RAW.root"); 	// Input file 
+  TFile *inFile = new TFile("./../ResultTrees/OriginalData/BCamData_RAW.root"); 	// Input file 
   TTree *treeB = (TTree*) inFile->Get("treeBCam");	// Tree from an input file containing RAW data from the .csv files arranged in a big tree
   TTree *treeM = (TTree*) inFile->Get("treeMagnet");
+  TTree *treeMT = (TTree*) inFile->Get("treeMagnetTemperature");
   TTree *treeV = (TTree*) inFile->Get("treeVoltage");
+  TTree *treeHV = (TTree*) inFile->Get("treeHybridVoltage");
 
   for (int i = 0; i < 12; i++) {
     treeT[i] = (TTree*) inFile->Get(Form("treeTemperature%s",boxes[i].c_str()));
@@ -43,11 +45,13 @@ void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19
   strptime(endTime.c_str(), "%d-%m-%Y %H:%M:%S", &tm);
   Int_t endEpoch = mktime(&tm);
   
-  TFile *outFile = new TFile("./../ResultTrees/BCamData_Skimmed.root","recreate");
+  TFile *outFile = new TFile("./../ResultTrees/OriginalData/BCamData_Skimmed.root","recreate");
 
   SkimTree(treeB, startEpoch, endEpoch, removeJumps);
   SkimTree(treeM, startEpoch, endEpoch, removeJumps);
+  SkimTree(treeMT, startEpoch, endEpoch, removeJumps);
   SkimTree(treeV, startEpoch, endEpoch, removeJumps);
+  SkimTree(treeHV, startEpoch, endEpoch, removeJumps);
 
   for (int i = 0; i < 12; i++) {
     SkimTree(treeT[i], startEpoch, endEpoch, removeJumps);
@@ -59,12 +63,14 @@ void MakeSkimming(string startTime = "01-05-2015 04:00:00", string endTime = "19
 
   treeB->Write();
   treeM->Write();
+  treeMT->Write();
   treeV->Write();
+  treeHV->Write();
   for (int i = 0; i < 12; i++) {
     treeT[i]->Write();
   }
 
-  cout << "Done, file ./../ResultTrees/BCamData_Skimmed.root created." << endl; 
+  cout << "Done, file " << outFile->GetName() << " created." << endl; 
 
   delete inFile;
   delete outFile;
@@ -140,6 +146,8 @@ void MatchCoordinatesWithTemperatures(TTree *treeInTemperature, TTree *treeInBCa
 	break;
       }
 
+      if ((j-prevJ) > 100000) {break;}
+
     }
 
     // If we have a match fill the Branches in new TemperatureTree with coordinates and time and temperature
@@ -175,10 +183,11 @@ void SkimTree(TTree *&treeIn, Int_t startEpoch, Int_t endEpoch, Bool_t removeJum
 
   cout << "Skimming " << treeName << endl;
   
-  if (treeName == "treeBCam") 	  	treeIn->SetBranchAddress("t11",&t);
-  if (treeName == "treeMagnet")   	{treeIn->SetBranchAddress("t",&t); removeJumps = false;}
-  if (treeName.substr(0,15) == "treeTemperature")   	{treeIn->SetBranchAddress("t",&t); removeJumps = false;}
-  if (treeName == "treeVoltage")   	{treeIn->SetBranchAddress("t",&t); removeJumps = false;}
+  if (treeName == "treeBCam") 	  			treeIn->SetBranchAddress("t11",&t);
+  if (treeName == "treeMagnet")   			treeIn->SetBranchAddress("t",&t); removeJumps = false;
+  if (treeName == "treeMagnetTemperature")   		treeIn->SetBranchAddress("t",&t); removeJumps = false;
+  if (treeName.substr(0,15) == "treeTemperature")   	treeIn->SetBranchAddress("t",&t); removeJumps = false;
+  if (treeName == "treeVoltage")   			treeIn->SetBranchAddress("t",&t); removeJumps = false;
 
   TTree* treeSkim = treeIn->CloneTree(0);
 
